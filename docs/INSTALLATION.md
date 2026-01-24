@@ -14,24 +14,23 @@ Complete installation guide for marktoflow CLI with troubleshooting.
 
 ## Installation Methods
 
-### Method 1: Install from GitHub (Recommended)
+### Method 1: Install from npm (Recommended)
 
-Install the latest development version directly from GitHub:
+Install from the npm registry:
 
 ```bash
-npm install -g github:scottgl9/marktoflow#main
+npm install -g @scottgl/marktoflow@alpha
 ```
 
 **Pros:**
 
-- Always get the latest features
-- No waiting for npm registry publication
-- Simple one-command install
+- Fast installation
+- Official npm package
+- Easy updates with `npm update -g @scottgl/marktoflow`
 
 **Cons:**
 
-- Requires git to be installed
-- Slower than npm registry (must clone repository)
+- Currently in alpha (use `@alpha` tag)
 
 ### Method 2: Use npx (No Installation)
 
@@ -39,12 +38,9 @@ Run marktoflow commands without installing:
 
 ```bash
 # Run any command with npx
-npx github:scottgl9/marktoflow version
-npx github:scottgl9/marktoflow init
-npx github:scottgl9/marktoflow run workflow.md
-
-# Use -y flag to skip confirmation prompts
-npx -y github:scottgl9/marktoflow version
+npx @scottgl/marktoflow@alpha version
+npx @scottgl/marktoflow@alpha init
+npx @scottgl/marktoflow@alpha run workflow.md
 ```
 
 **Pros:**
@@ -59,27 +55,23 @@ npx -y github:scottgl9/marktoflow version
 - Slower (downloads package each time, but caches it)
 - Requires typing full package path
 
-### Method 3: Install from npm (Coming Soon)
+### Method 3: Install from GitHub
 
-Once published to npm registry:
+Install the latest development version directly from GitHub:
 
 ```bash
-# Install globally
-npm install -g marktoflow
-
-# Verify
-marktoflow version
+npm install -g github:scottgl9/marktoflow#main
 ```
 
 **Pros:**
 
-- Fast installation
-- Official npm package
-- Easy updates with `npm update -g marktoflow`
+- Always get the latest unreleased features
+- Simple one-command install
 
 **Cons:**
 
-- Not yet available (pending publication)
+- Requires git to be installed
+- Slower than npm registry
 
 ### Method 4: Install from Source
 
@@ -278,7 +270,7 @@ marktoflow version
 **Option 1: Use npx (Recommended)**
 
 ```bash
-npx github:scottgl9/marktoflow version
+npx @scottgl/marktoflow@alpha version
 ```
 
 **Option 2: Configure npm to use user directory**
@@ -297,13 +289,13 @@ export PATH="$PATH:$HOME/.npm-global/bin"
 source ~/.bashrc  # or ~/.zshrc
 
 # Try installation again
-npm install -g github:scottgl9/marktoflow#main
+npm install -g @scottgl/marktoflow@alpha
 ```
 
 **Option 3: Use sudo (Not Recommended)**
 
 ```bash
-sudo npm install -g github:scottgl9/marktoflow#main
+sudo npm install -g @scottgl/marktoflow@alpha
 ```
 
 **Note:** Using sudo can cause permission issues later. Options 1 or 2 are better.
@@ -329,11 +321,11 @@ npm link
 **Solution:**
 
 ```bash
-# Reinstall from GitHub (rebuilds automatically)
-npm install -g --force github:scottgl9/marktoflow-automation#main
+# Reinstall from npm
+npm install -g --force @scottgl/marktoflow@alpha
 
 # Or if installing from source:
-cd marktoflow-automation
+cd marktoflow
 pnpm install
 pnpm build
 cd packages/cli
@@ -349,8 +341,8 @@ npm link
 1. **Use npx with cache:**
 
    ```bash
-   npx github:scottgl9/marktoflow version
-   # First run is slow, subsequent runs use cache
+   npx @scottgl/marktoflow@alpha version
+   # First run downloads, subsequent runs use cache
    ```
 
 2. **Check npm registry:**
@@ -362,7 +354,7 @@ npm link
 
 3. **Use verbose logging:**
    ```bash
-   npm install -g github:scottgl9/marktoflow#main --verbose
+   npm install -g @scottgl/marktoflow@alpha --verbose
    ```
 
 ### Issue: "Cannot find module '@marktoflow/core'"
@@ -393,20 +385,20 @@ npm cache clean --force
 
 # Reinstall global package
 npm uninstall -g marktoflow
-npm install -g github:scottgl9/marktoflow#main
+npm install -g @scottgl/marktoflow@alpha
 
 # Or use npx with --no-cache
-npx --no-cache github:scottgl9/marktoflow version
+npx --no-cache @scottgl/marktoflow@alpha version
 ```
 
 ---
 
 ## Uninstallation
 
-### If installed globally from GitHub:
+### If installed globally from npm:
 
 ```bash
-npm uninstall -g marktoflow
+npm uninstall -g @scottgl/marktoflow
 ```
 
 ### If installed from source with npm link:
