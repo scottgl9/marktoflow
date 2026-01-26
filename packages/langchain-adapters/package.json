@@ -1,0 +1,63 @@
+{
+  "name": "@marktoflow/langchain-adapters",
+  "version": "2.0.0-alpha.1",
+  "description": "LangChain adapters for GitHub Copilot and Claude Code with Stagehand and Playwright integration",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "langchain",
+    "github-copilot",
+    "claude-code",
+    "stagehand",
+    "playwright",
+    "browser-automation",
+    "ai",
+    "llm"
+  ],
+  "author": "Scott Glover <scottgl@gmail.com>",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@langchain/core": "^0.3.0"
+  },
+  "peerDependencies": {
+    "@browserbasehq/stagehand": "^2.0.0",
+    "playwright": "^1.40.0"
+  },
+  "peerDependenciesMeta": {
+    "@browserbasehq/stagehand": {
+      "optional": true
+    },
+    "playwright": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}
