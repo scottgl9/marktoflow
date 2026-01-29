@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import { RotateCw, CheckCircle, XCircle, Clock, LogOut, AlertTriangle } from 'lucide-react';
+import { RotateCw, CheckCircle, XCircle, Clock, LogOut, AlertTriangle, ArrowRight, ArrowLeft } from 'lucide-react';
 
 export interface WhileNodeData extends Record<string, unknown> {
   id: string;
@@ -46,7 +46,7 @@ function WhileNodeComponent({ data, selected }: NodeProps<WhileNodeType>) {
 
   return (
     <div
-      className={`control-flow-node while-node p-0 ${selected ? 'selected' : ''} ${status === 'running' ? 'running' : ''} ${status === 'completed' ? 'completed' : ''} ${status === 'failed' ? 'failed' : ''}`}
+      className={`control-flow-node while-node p-0 relative ${selected ? 'selected' : ''} ${status === 'running' ? 'running' : ''} ${status === 'completed' ? 'completed' : ''} ${status === 'failed' ? 'failed' : ''}`}
       style={{
         background: 'linear-gradient(135deg, #fb923c 0%, #f97316 100%)',
       }}
@@ -139,21 +139,41 @@ function WhileNodeComponent({ data, selected }: NodeProps<WhileNodeType>) {
         </div>
       </div>
 
-      {/* Output handle */}
+      {/* Output handle (bottom) - aggregated result */}
       <Handle
         type="source"
         position={Position.Bottom}
         className="!w-3 !h-3 !bg-primary !border-2 !border-node-bg"
       />
 
-      {/* Loop-back handle (left side for iteration feedback) */}
+      {/* Right side loop handles */}
+      {/* Loop output (top-right) - sends current state TO loop body */}
       <Handle
-        id="loop-back"
+        id="loop-out"
         type="source"
-        position={Position.Left}
-        className="!w-3 !h-3 !bg-orange-500 !border-2 !border-node-bg"
-        style={{ top: '50%', left: '-6px' }}
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-orange-400 !border-2 !border-node-bg"
+        style={{ top: '35%', right: '-6px' }}
       />
+
+      {/* Loop input (bottom-right) - receives result FROM loop body */}
+      <Handle
+        id="loop-in"
+        type="target"
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-orange-600 !border-2 !border-node-bg"
+        style={{ top: '65%', right: '-6px' }}
+      />
+
+      {/* Loop flow indicator */}
+      <div
+        className="absolute right-[-24px] top-[50%] transform -translate-y-1/2 flex flex-col items-center gap-1 text-orange-400"
+        style={{ pointerEvents: 'none' }}
+      >
+        <ArrowRight className="w-3 h-3" />
+        <div className="w-px h-4 bg-orange-400/50" />
+        <ArrowLeft className="w-3 h-3" />
+      </div>
     </div>
   );
 }

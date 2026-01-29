@@ -237,8 +237,7 @@ export function workflowToGraph(workflow: Workflow & { markdown?: string }): Gra
     } else if (step.type === 'try') {
       nodeData = {
         ...baseData,
-        hasCatch: true,
-        hasFinally: false,
+        // Simplified to 2 outputs: success and catch
       };
     } else if (step.type === 'if') {
       nodeData = {
@@ -300,14 +299,16 @@ export function workflowToGraph(workflow: Workflow & { markdown?: string }): Gra
       edges.push(edge);
     }
 
-    // Add loop-back edge for loops
+    // Add loop edges for loops (right side: loop-out -> loop body -> loop-in)
     if (step.type === 'while' || step.type === 'for_each' || step.type === 'for') {
       const loopColor = step.type === 'while' ? '#fb923c' : '#f093fb';
+      // Loop output to loop input edge (self-referential feedback loop on right side)
       edges.push({
-        id: `e-${step.id}-loop-back`,
+        id: `e-${step.id}-loop`,
         source: step.id,
         target: step.id,
-        sourceHandle: 'loop-back',
+        sourceHandle: 'loop-out',
+        targetHandle: 'loop-in',
         type: 'smoothstep',
         animated: true,
         style: {
@@ -315,23 +316,24 @@ export function workflowToGraph(workflow: Workflow & { markdown?: string }): Gra
           strokeWidth: 2,
           strokeDasharray: '5,5',
         },
-        label: step.type === 'while' ? 'while true' : 'for each item',
+        label: step.type === 'while' ? 'iterate' : 'each item',
         labelStyle: { fill: loopColor, fontSize: 9 },
         labelBgStyle: { fill: '#1a1a2e', fillOpacity: 0.9 },
       });
     }
 
-    // Add iteration indicator for transform operations (map/filter/reduce)
+    // Add iteration edges for transform operations (map/filter/reduce)
     if (step.type === 'map' || step.type === 'filter' || step.type === 'reduce') {
       const transformColor = '#14b8a6';
-      const label = step.type === 'map' ? 'transform each' :
-                    step.type === 'filter' ? 'test each' :
-                    'accumulate';
+      const label = step.type === 'map' ? 'transform' :
+                    step.type === 'filter' ? 'filter' :
+                    'reduce';
       edges.push({
-        id: `e-${step.id}-transform-flow`,
+        id: `e-${step.id}-transform-loop`,
         source: step.id,
         target: step.id,
-        sourceHandle: 'loop-back',
+        sourceHandle: 'loop-out',
+        targetHandle: 'loop-in',
         type: 'smoothstep',
         animated: true,
         style: {

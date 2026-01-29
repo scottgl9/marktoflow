@@ -140,6 +140,25 @@
   position: relative;
 }
 
+/* Right-side loop handles container spacing */
+.while-node,
+.for-each-node,
+.transform-node {
+  margin-right: 30px; /* Space for loop indicators on right side */
+}
+
+/* Loop handle hover effects */
+.react-flow__handle[data-handleid="loop-out"],
+.react-flow__handle[data-handleid="loop-in"] {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.react-flow__handle[data-handleid="loop-out"]:hover,
+.react-flow__handle[data-handleid="loop-in"]:hover {
+  transform: scale(1.3);
+  box-shadow: 0 0 8px currentColor;
+}
+
 /* Execution overlays for control flow nodes */
 .control-flow-overlay {
   position: absolute;

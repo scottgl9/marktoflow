@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import {
   ArrowRight,
+  ArrowLeft,
   Filter,
   Minimize2,
   CheckCircle,
@@ -76,7 +77,7 @@ function TransformNodeComponent({ data, selected }: NodeProps<TransformNodeType>
 
   return (
     <div
-      className={`control-flow-node transform-node p-0 ${selected ? 'selected' : ''} ${status === 'running' ? 'running' : ''}`}
+      className={`control-flow-node transform-node p-0 relative ${selected ? 'selected' : ''} ${status === 'running' ? 'running' : ''}`}
       style={{
         background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
       }}
@@ -172,21 +173,41 @@ function TransformNodeComponent({ data, selected }: NodeProps<TransformNodeType>
         </div>
       </div>
 
-      {/* Output handle */}
+      {/* Output handle (bottom) - transformed result */}
       <Handle
         type="source"
         position={Position.Bottom}
         className="!w-3 !h-3 !bg-primary !border-2 !border-node-bg"
       />
 
-      {/* Loop-back handle for iteration visualization */}
+      {/* Right side loop handles */}
+      {/* Loop output (top-right) - sends current item TO transform body */}
       <Handle
-        id="loop-back"
+        id="loop-out"
         type="source"
-        position={Position.Left}
-        className="!w-3 !h-3 !bg-teal-500 !border-2 !border-node-bg"
-        style={{ top: '50%', left: '-6px' }}
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-teal-400 !border-2 !border-node-bg"
+        style={{ top: '35%', right: '-6px' }}
       />
+
+      {/* Loop input (bottom-right) - receives transformed item FROM transform body */}
+      <Handle
+        id="loop-in"
+        type="target"
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-teal-600 !border-2 !border-node-bg"
+        style={{ top: '65%', right: '-6px' }}
+      />
+
+      {/* Loop flow indicator */}
+      <div
+        className="absolute right-[-24px] top-[50%] transform -translate-y-1/2 flex flex-col items-center gap-1 text-teal-400"
+        style={{ pointerEvents: 'none' }}
+      >
+        <ArrowRight className="w-3 h-3" />
+        <div className="w-px h-4 bg-teal-400/50" />
+        <ArrowLeft className="w-3 h-3" />
+      </div>
     </div>
   );
 }

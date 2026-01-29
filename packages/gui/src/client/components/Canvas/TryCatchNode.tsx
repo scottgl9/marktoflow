@@ -5,11 +5,11 @@ import { Shield, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react
 export interface TryCatchNodeData extends Record<string, unknown> {
   id: string;
   name?: string;
-  hasCatch?: boolean;
-  hasFinally?: boolean;
   status?: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
-  activeBranch?: 'try' | 'catch' | 'finally' | null;
+  activeBranch?: 'success' | 'catch' | null;
+  skippedBranch?: 'success' | 'catch' | null;
   errorOccurred?: boolean;
+  errorMessage?: string;
 }
 
 export type TryCatchNodeType = Node<TryCatchNodeData, 'try'>;
@@ -83,80 +83,70 @@ function TryCatchNodeComponent({ data, selected }: NodeProps<TryCatchNodeType>) 
         {data.errorOccurred && (
           <div className="mb-3 p-2 bg-red-500/20 border border-red-500/30 rounded flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-red-200" />
-            <span className="text-xs text-red-200 font-medium">Error occurred</span>
+            <span className="text-xs text-red-200 font-medium">
+              {data.errorMessage || 'Error occurred'}
+            </span>
           </div>
         )}
 
-        {/* Branch indicators */}
-        <div className="space-y-2">
+        {/* Branch outputs */}
+        <div className="grid grid-cols-2 gap-2">
           <div
-            className={`text-center p-2 rounded text-xs font-medium transition-colors ${
-              data.activeBranch === 'try'
-                ? 'bg-blue-500/30 text-blue-200 ring-1 ring-blue-400/50'
-                : 'bg-white/5 text-white/60'
+            className={`text-center p-2 rounded text-xs font-medium transition-colors relative ${
+              data.activeBranch === 'success'
+                ? 'bg-green-500/30 text-green-200 ring-1 ring-green-400/50'
+                : data.skippedBranch === 'success'
+                  ? 'bg-gray-500/20 text-gray-400'
+                  : 'bg-white/5 text-white/60'
             }`}
           >
-            ✓ Try
+            ✓ Success
+            {data.skippedBranch === 'success' && (
+              <span className="absolute -top-1 -right-1 text-[8px] px-1 py-0.5 rounded bg-gray-500/50 text-gray-300">
+                SKIP
+              </span>
+            )}
           </div>
-
-          {data.hasCatch && (
-            <div
-              className={`text-center p-2 rounded text-xs font-medium transition-colors ${
-                data.activeBranch === 'catch'
-                  ? 'bg-red-500/30 text-red-200 ring-1 ring-red-400/50'
+          <div
+            className={`text-center p-2 rounded text-xs font-medium transition-colors relative ${
+              data.activeBranch === 'catch'
+                ? 'bg-red-500/30 text-red-200 ring-1 ring-red-400/50'
+                : data.skippedBranch === 'catch'
+                  ? 'bg-gray-500/20 text-gray-400'
                   : 'bg-white/5 text-white/60'
-              }`}
-            >
-              ⚠ Catch
-            </div>
-          )}
-
-          {data.hasFinally && (
-            <div
-              className={`text-center p-2 rounded text-xs font-medium transition-colors ${
-                data.activeBranch === 'finally'
-                  ? 'bg-purple-500/30 text-purple-200 ring-1 ring-purple-400/50'
-                  : 'bg-white/5 text-white/60'
-              }`}
-            >
-              ⟳ Finally
-            </div>
-          )}
+            }`}
+          >
+            ⚠ Catch
+            {data.skippedBranch === 'catch' && (
+              <span className="absolute -top-1 -right-1 text-[8px] px-1 py-0.5 rounded bg-gray-500/50 text-gray-300">
+                SKIP
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Info */}
         <div className="mt-3 text-xs text-white/50 flex items-center gap-2">
           <span>ℹ️</span>
-          <span>Finally always executes</span>
+          <span>Catches errors from wrapped steps</span>
         </div>
       </div>
 
-      {/* Output handles */}
+      {/* Output handles - 2 outputs like if/else */}
       <Handle
         type="source"
         position={Position.Bottom}
-        id="try"
-        style={{ left: '25%' }}
-        className="!w-2.5 !h-2.5 !bg-blue-500 !border-2 !border-node-bg"
+        id="success"
+        style={{ left: '33%' }}
+        className="!w-3 !h-3 !bg-green-500 !border-2 !border-node-bg"
       />
-      {data.hasCatch && (
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          id="catch"
-          style={{ left: '50%' }}
-          className="!w-2.5 !h-2.5 !bg-red-500 !border-2 !border-node-bg"
-        />
-      )}
-      {data.hasFinally && (
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          id="finally"
-          style={{ left: '75%' }}
-          className="!w-2.5 !h-2.5 !bg-purple-500 !border-2 !border-node-bg"
-        />
-      )}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="catch"
+        style={{ left: '67%' }}
+        className="!w-3 !h-3 !bg-red-500 !border-2 !border-node-bg"
+      />
     </div>
   );
 }
