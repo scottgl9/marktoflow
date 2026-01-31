@@ -1,39 +1,37 @@
 # LifeOS: Autonomous Knowledge Engine
 
-A "headless" operating system for your life. It solves the fundamental friction of Knowledge Management: **Capturing is fast, but Organization is slow.**
+A "headless" operating system for your life. Talk to it naturally - it handles everything else.
 
-The user simply "talks" to the system via their favorite chat app. An AI Agent—acting as a Librarian, Secretary, and Analyst—autonomously handles the rest.
+**Write:** "Remind me to check the server logs tomorrow" → Saved to tasks
+**Read:** "What is the API key for Apollo?" → Returns the answer
 
 ---
 workflow:
-  id: lifeos-master
-  name: 'LifeOS Master Plan'
+  id: lifeos
+  name: 'LifeOS'
   version: '2.0.0'
   description: |
-    LifeOS transforms a folder of static Markdown files into a Conversation Partner
-    that remembers everything, asks clarifying questions, and organizes your life
-    in the background.
+    A unified knowledge management system that handles both:
+    - Writing: tasks, notes, events, journal entries, references
+    - Reading: questions, searches, summaries
 
-    Four Modules:
-    - Module A: Unified Ingestion Layer (The Listener)
-    - Module B: Context Router (The Librarian)
-    - Module C: Semantic Reconciler (The Editor)
-    - Module D: Retrieval Engine (The Memory)
+    Four AI Modules:
+    - Module A: Ingestion (normalize input from any source)
+    - Module B: Router (parse intent, route to location)
+    - Module C: Reconciler (deduplicate, update existing)
+    - Module D: Retrieval (search and answer questions)
   author: 'lifeos'
   tags:
     - knowledge-management
     - personal-assistant
-    - automation
     - ai-agent
 
 tools:
-  # AI Agent for parsing, routing, and deduplication
   agent:
     sdk: 'claude-agent'
     options:
       model: 'sonnet'
 
-  # Communication channels
   slack:
     sdk: '@slack/web-api'
     auth:
@@ -44,70 +42,53 @@ tools:
     auth:
       token: '${TELEGRAM_BOT_TOKEN}'
 
-  # File operations for knowledge base
   core:
     sdk: 'core'
 
 triggers:
-  # Manual trigger for direct input
   - type: manual
-
-  # Webhook for incoming messages
   - type: webhook
-    path: /lifeos/ingest
+    path: /lifeos
     method: POST
 
 inputs:
-  # The raw user input text
   message:
     type: string
     required: true
-    description: 'Raw unstructured text from user (task, note, question, etc.)'
+    description: 'Natural language input (question, task, note, etc.)'
 
-  # Source channel for reply routing
   source:
     type: string
     required: false
     default: 'cli'
-    description: 'Source channel: slack, telegram, cli'
+    description: 'Source: slack, telegram, cli'
 
-  # Channel/chat ID for replies
   channel_id:
     type: string
     required: false
-    description: 'Channel or chat ID for sending replies'
+    description: 'Channel/chat ID for replies'
 
-  # Knowledge base root path
   knowledge_base:
     type: string
     required: false
     default: './LifeOS'
-    description: 'Root path to the LifeOS knowledge base'
-
-  # Mode: ingest (write) or query (read)
-  mode:
-    type: string
-    required: false
-    default: 'auto'
-    description: 'Mode: ingest, query, or auto (AI determines)'
+    description: 'Path to knowledge base'
 
 outputs:
   response:
     type: string
-    description: 'Response message to send back to user'
+    description: 'Response to user'
 
-  action_taken:
+  action:
     type: string
-    description: 'Description of what LifeOS did'
+    description: 'Action taken: saved, retrieved, clarified'
 
-  files_modified:
+  files:
     type: array
-    description: 'List of files created or modified'
+    description: 'Files modified or searched'
 ---
 
-## Step 1: Initialize Knowledge Base Structure
-
-Ensure the directory structure exists with the 4-level taxonomy.
+## Step 1: Initialize Knowledge Base
 
 ```yaml
 action: script.execute
@@ -115,66 +96,34 @@ inputs:
   code: |
     const fs = require('fs');
     const path = require('path');
-
     const basePath = context.inputs.knowledge_base || './LifeOS';
 
-    // 4-level taxonomy structure
     const structure = {
-      'Work': {
-        'Projects': {},
-        'Areas': {},
-        'Archives': {}
-      },
-      'Personal': {
-        'Projects': {},
-        'Areas': {},
-        'Archives': {}
-      },
-      'Calendar': {
-        'Future_Events.md': '# Future Events\n\n',
-        'Recurring.md': '# Recurring Events\n\n'
-      },
-      'Journal': {}
+      'Work/Projects': null,
+      'Work/Areas': null,
+      'Work/Archives': null,
+      'Personal/Projects': null,
+      'Personal/Areas': null,
+      'Personal/Archives': null,
+      'Calendar': null,
+      'Journal': null
     };
 
-    function ensureStructure(basePath, struct) {
-      for (const [name, content] of Object.entries(struct)) {
-        const fullPath = path.join(basePath, name);
-        if (name.endsWith('.md')) {
-          // It's a file
-          if (!fs.existsSync(fullPath)) {
-            fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-            fs.writeFileSync(fullPath, content);
-          }
-        } else {
-          // It's a directory
-          fs.mkdirSync(fullPath, { recursive: true });
-          if (typeof content === 'object') {
-            ensureStructure(fullPath, content);
-          }
-        }
-      }
+    for (const dir of Object.keys(structure)) {
+      fs.mkdirSync(path.join(basePath, dir), { recursive: true });
     }
 
-    try {
-      ensureStructure(basePath, structure);
-      return {
-        success: true,
-        base_path: basePath,
-        message: 'Knowledge base initialized'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+    // Create default calendar file
+    const calPath = path.join(basePath, 'Calendar/events.md');
+    if (!fs.existsSync(calPath)) {
+      fs.writeFileSync(calPath, '# Events\n\n');
     }
-output_variable: init_result
+
+    return { base_path: basePath };
+output_variable: init
 ```
 
-## Step 2: Scan Existing Knowledge Base
-
-Map the current directory tree to understand the user's life context.
+## Step 2: Scan Knowledge Base Context
 
 ```yaml
 action: script.execute
@@ -182,520 +131,469 @@ inputs:
   code: |
     const fs = require('fs');
     const path = require('path');
+    const basePath = context.init.base_path;
 
-    const basePath = context.init_result.base_path;
     const projects = [];
     const areas = [];
-    const recentFiles = [];
+    const files = [];
 
-    function scanDirectory(dirPath, depth = 0) {
+    function scan(dir, depth = 0) {
       if (depth > 4) return;
-
       try {
-        const items = fs.readdirSync(dirPath);
-
-        for (const item of items) {
-          const fullPath = path.join(dirPath, item);
-          const stat = fs.statSync(fullPath);
-          const relativePath = path.relative(basePath, fullPath);
+        for (const item of fs.readdirSync(dir)) {
+          const full = path.join(dir, item);
+          const rel = path.relative(basePath, full);
+          const stat = fs.statSync(full);
 
           if (stat.isDirectory()) {
-            // Track projects and areas
-            if (relativePath.includes('/Projects/') && depth === 2) {
-              projects.push({
-                name: item,
-                path: relativePath,
-                domain: relativePath.split('/')[0]
-              });
-            } else if (relativePath.includes('/Areas/') && depth === 2) {
-              areas.push({
-                name: item,
-                path: relativePath,
-                domain: relativePath.split('/')[0]
-              });
+            if (rel.includes('/Projects/') && depth === 2) {
+              projects.push({ name: item, path: rel });
+            } else if (rel.includes('/Areas/') && depth === 2) {
+              areas.push({ name: item, path: rel });
             }
-            scanDirectory(fullPath, depth + 1);
+            scan(full, depth + 1);
           } else if (item.endsWith('.md')) {
-            recentFiles.push({
-              name: item,
-              path: relativePath,
-              modified: stat.mtime
-            });
+            files.push({ name: item, path: rel, modified: stat.mtime });
           }
         }
-      } catch (e) {
-        // Skip inaccessible directories
-      }
+      } catch (e) {}
     }
 
-    scanDirectory(basePath);
-
-    // Sort recent files by modification time
-    recentFiles.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+    scan(basePath);
+    files.sort((a, b) => new Date(b.modified) - new Date(a.modified));
 
     return {
-      projects: projects.slice(0, 20),
-      areas: areas.slice(0, 20),
-      recent_files: recentFiles.slice(0, 10),
-      summary: `Found ${projects.length} projects, ${areas.length} areas`
+      projects: projects.slice(0, 15),
+      areas: areas.slice(0, 15),
+      recent: files.slice(0, 10)
     };
-output_variable: knowledge_map
+output_variable: context_map
 ```
 
-## Step 3: Module A - Parse Intent and Classify
+## Step 3: Parse Intent with AI
 
-The AI Librarian analyzes the input to determine intent, extract entities, and identify the target location.
+The Librarian determines what the user wants and where it should go.
 
 ```yaml
 action: agent.run
 inputs:
   prompt: |
-    You are the LifeOS Librarian - an AI that organizes a personal knowledge base.
+    You are LifeOS - a personal knowledge assistant.
 
-    ## Current Knowledge Base Context
-
-    **Active Projects:**
-    {% for project in knowledge_map.projects %}
-    - {{ project.domain }}/Projects/{{ project.name }}
-    {% endfor %}
-
-    **Active Areas:**
-    {% for area in knowledge_map.areas %}
-    - {{ area.domain }}/Areas/{{ area.name }}
-    {% endfor %}
-
-    **Recently Modified Files:**
-    {% for file in knowledge_map.recent_files %}
-    - {{ file.path }}
-    {% endfor %}
+    ## Knowledge Base
+    **Projects:** {% for p in context_map.projects %}{{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+    **Areas:** {% for a in context_map.areas %}{{ a.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+    **Recent files:** {% for f in context_map.recent %}{{ f.path }}{% if not loop.last %}, {% endif %}{% endfor %}
 
     ## User Input
-
     "{{ inputs.message }}"
 
-    ## Your Task
+    ## Determine Intent
 
-    Analyze this input and determine:
+    **Intent types:**
+    - `query` - A question to answer (starts with what/when/where/who/how/why, contains ?, or asks for information)
+    - `task` - A to-do or reminder (remind, todo, need to, should, must, don't forget)
+    - `note` - Information to store (note that, remember, learned, the X is Y)
+    - `event` - Calendar entry (meeting, appointment, on [date], at [time])
+    - `journal` - Personal reflection (I feel, today I, reflecting)
+    - `reference` - Static data (API key, password, phone number, address)
 
-    1. **Intent Type**:
-       - `task` - A to-do item or reminder
-       - `note` - Information to store
-       - `event` - Calendar/time-based entry
-       - `query` - A question to answer (retrieval mode)
-       - `journal` - Personal reflection/diary entry
-       - `reference` - Static data like API keys, passwords, contact info
-
-    2. **Confidence Score**: 0-100 (how certain you are about routing)
-
-    3. **Target Location**: Where should this go?
-       - Match to existing project/area if relevant
-       - Suggest new entity if clearly new topic
-       - For queries: identify which files to search
-
-    4. **Extracted Entities**:
-       - Time references (convert relative to absolute dates)
-       - People mentioned
-       - Project/topic references
-       - Tags/categories
-
-    5. **Clarification Needed**: If confidence < 80, what question would help?
-
-    ## Response Format (JSON only)
-
+    **Respond with JSON only:**
     ```json
     {
-      "intent_type": "task|note|event|query|journal|reference",
+      "intent": "query|task|note|event|journal|reference",
       "confidence": 85,
       "target": {
-        "domain": "Work|Personal",
-        "category": "Projects|Areas|Archives|Calendar|Journal",
-        "entity": "EntityName",
-        "artifact": "tasks.md|notes.md|resources.md|investigation.md|meeting_logs.md",
-        "path": "Work/Projects/Apollo/tasks.md",
-        "action": "append|update|create|search"
+        "domain": "Work|Personal|Calendar|Journal",
+        "entity": "ProjectName or AreaName or null",
+        "file": "tasks.md|notes.md|resources.md|events.md",
+        "path": "Work/Projects/Apollo/tasks.md"
       },
       "extracted": {
-        "title": "Short title for the entry",
-        "content": "Formatted content to save",
+        "title": "Brief title",
+        "content": "Full content to save",
         "due_date": "YYYY-MM-DD or null",
-        "tags": ["tag1", "tag2"],
-        "people": ["John", "Sarah"],
-        "references": {"api_key": "12345"}
+        "tags": ["tag1"],
+        "search_terms": ["term1", "term2"]
       },
       "clarification": {
         "needed": false,
-        "question": null,
-        "options": []
-      },
-      "reasoning": "Brief explanation of routing decision"
+        "question": null
+      }
     }
     ```
-output_variable: intent_analysis
+output_variable: intent_raw
 ```
 
-## Step 4: Parse AI Response
-
-Extract the structured analysis from the AI response.
+## Step 4: Parse Intent Response
 
 ```yaml
 action: script.execute
 inputs:
   code: |
-    const response = context.intent_analysis;
-
-    // Extract JSON from the response
-    let analysis;
+    const raw = context.intent_raw;
     try {
-      // Try to find JSON in the response
-      const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
-      if (jsonMatch) {
-        analysis = JSON.parse(jsonMatch[1]);
-      } else {
-        // Try parsing the whole response as JSON
-        analysis = JSON.parse(response);
-      }
+      const match = raw.match(/```json\s*([\s\S]*?)\s*```/);
+      return match ? JSON.parse(match[1]) : JSON.parse(raw);
     } catch (e) {
-      // Fallback to a clarification request
-      analysis = {
-        intent_type: 'unknown',
+      return {
+        intent: 'unknown',
         confidence: 0,
-        clarification: {
-          needed: true,
-          question: "I couldn't understand that input. Could you rephrase it?",
-          options: []
-        }
+        clarification: { needed: true, question: "I didn't understand that. Could you rephrase?" }
       };
     }
-
-    return analysis;
-output_variable: parsed_intent
+output_variable: intent
 ```
 
-## Step 5: Handle Low Confidence - Clarification Flow
-
-If confidence is low, ask the user for clarification instead of guessing.
+## Step 5: Handle Clarification
 
 ```yaml
 - type: if
-  id: check_confidence
-  condition: '{{ parsed_intent.confidence < 80 && parsed_intent.clarification.needed }}'
+  condition: '{{ intent.confidence < 70 && intent.clarification.needed }}'
   then:
     - action: script.execute
       inputs:
         code: |
-          const intent = context.parsed_intent;
-          const question = intent.clarification.question;
-          const options = intent.clarification.options || [];
+          return {
+            response: context.intent.clarification.question,
+            action: 'clarified',
+            files: [],
+            done: true
+          };
+      output_variable: result
+  else:
+    - action: script.execute
+      inputs:
+        code: |
+          return { done: false };
+      output_variable: result
+```
 
-          let message = question;
-          if (options.length > 0) {
-            message += '\n\nOptions:\n' + options.map((o, i) => `${i + 1}. ${o}`).join('\n');
+## Step 6: Handle Query (Read Mode)
+
+Search the knowledge base and answer questions.
+
+```yaml
+- type: if
+  condition: '{{ !result.done && intent.intent == "query" }}'
+  then:
+    # Search files
+    - action: script.execute
+      inputs:
+        code: |
+          const fs = require('fs');
+          const path = require('path');
+          const basePath = context.init.base_path;
+          const terms = (context.intent.extracted.search_terms || []).map(t => t.toLowerCase());
+          const query = context.inputs.message.toLowerCase();
+
+          const results = [];
+
+          function search(dir) {
+            try {
+              for (const item of fs.readdirSync(dir)) {
+                const full = path.join(dir, item);
+                const stat = fs.statSync(full);
+
+                if (stat.isDirectory()) {
+                  search(full);
+                } else if (item.endsWith('.md')) {
+                  const content = fs.readFileSync(full, 'utf8');
+                  const lower = content.toLowerCase();
+                  let score = 0;
+
+                  // Score by search terms
+                  for (const term of terms) {
+                    if (lower.includes(term)) score += 10;
+                  }
+
+                  // Score by query words
+                  for (const word of query.split(' ')) {
+                    if (word.length > 3 && lower.includes(word)) score += 5;
+                  }
+
+                  if (score > 0) {
+                    results.push({
+                      path: path.relative(basePath, full),
+                      score,
+                      content: content.substring(0, 3000)
+                    });
+                  }
+                }
+              }
+            } catch (e) {}
           }
 
+          search(basePath);
+          results.sort((a, b) => b.score - a.score);
+
+          return { results: results.slice(0, 5) };
+      output_variable: search
+
+    # Generate answer
+    - action: agent.run
+      inputs:
+        prompt: |
+          Answer this question based on the knowledge base:
+
+          **Question:** "{{ inputs.message }}"
+
+          **Found in knowledge base:**
+          {% for r in search.results %}
+          --- {{ r.path }} ---
+          {{ r.content }}
+          {% endfor %}
+
+          {% if search.results.length == 0 %}
+          No relevant files found.
+          {% endif %}
+
+          **Instructions:**
+          - Answer directly and concisely
+          - Quote exact values when available (API keys, dates, names)
+          - Say "I couldn't find that information" if not in the sources
+          - Do NOT make up information
+      output_variable: answer
+
+    - action: script.execute
+      inputs:
+        code: |
           return {
-            needs_clarification: true,
-            response: message,
-            action_taken: 'Requested clarification from user',
-            files_modified: []
+            response: context.answer,
+            action: 'retrieved',
+            files: context.search.results.map(r => r.path),
+            done: true
           };
-      output_variable: clarification_response
-  else:
-    - action: script.execute
-      inputs:
-        code: |
-          return { needs_clarification: false };
-      output_variable: clarification_response
+      output_variable: result
 ```
 
-## Step 6: Route to Appropriate Handler
-
-Based on intent type, route to the appropriate processing logic.
+## Step 7: Handle Task
 
 ```yaml
 - type: if
-  id: skip_if_clarification
-  condition: '{{ !clarification_response.needs_clarification }}'
-  then:
-    - type: switch
-      expression: '{{ parsed_intent.intent_type }}'
-      cases:
-        query:
-          # Module D: Retrieval Engine
-          - action: agent.run
-            inputs:
-              prompt: |
-                You are the LifeOS Memory - a retrieval system for a personal knowledge base.
-
-                ## Query
-                "{{ inputs.message }}"
-
-                ## Target Files to Search
-                Path: {{ parsed_intent.target.path }}
-
-                ## Instructions
-                Search the knowledge base for relevant information to answer this query.
-                Provide a concise, factual answer based on stored data.
-                If the information isn't found, say so clearly.
-
-                Format your response as a direct answer, not as JSON.
-            output_variable: query_result
-
-          - action: script.execute
-            inputs:
-              code: |
-                return {
-                  response: context.query_result,
-                  action_taken: 'Retrieved information from knowledge base',
-                  files_modified: []
-                };
-            output_variable: final_result
-
-        task:
-          # Module C: Write task to appropriate file
-          - action: script.execute
-            inputs:
-              code: |
-                const fs = require('fs');
-                const path = require('path');
-
-                const intent = context.parsed_intent;
-                const basePath = context.init_result.base_path;
-                const targetPath = path.join(basePath, intent.target.path);
-
-                // Ensure parent directory exists
-                fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-
-                // Read existing content
-                let existingContent = '';
-                try {
-                  existingContent = fs.readFileSync(targetPath, 'utf8');
-                } catch (e) {
-                  // File doesn't exist, create with header
-                  existingContent = `# Tasks - ${intent.target.entity}\n\n`;
-                }
-
-                // Check for duplicates (Semantic Reconciler logic)
-                const newTitle = intent.extracted.title.toLowerCase();
-                const isDuplicate = existingContent.toLowerCase().includes(newTitle);
-
-                if (isDuplicate) {
-                  return {
-                    response: `This task already exists in ${intent.target.entity}.`,
-                    action_taken: 'Duplicate detected, no changes made',
-                    files_modified: []
-                  };
-                }
-
-                // Format new task entry
-                const dueDate = intent.extracted.due_date
-                  ? ` 📅 ${intent.extracted.due_date}`
-                  : '';
-                const tags = intent.extracted.tags.length > 0
-                  ? ` #${intent.extracted.tags.join(' #')}`
-                  : '';
-                const taskEntry = `- [ ] ${intent.extracted.title}${dueDate}${tags}\n`;
-
-                // Append to file
-                const updatedContent = existingContent + taskEntry;
-                fs.writeFileSync(targetPath, updatedContent);
-
-                return {
-                  response: `Saved task to ${intent.target.entity}.`,
-                  action_taken: `Added task: "${intent.extracted.title}"`,
-                  files_modified: [intent.target.path]
-                };
-            output_variable: final_result
-
-        note:
-          # Module C: Write note to appropriate file
-          - action: script.execute
-            inputs:
-              code: |
-                const fs = require('fs');
-                const path = require('path');
-
-                const intent = context.parsed_intent;
-                const basePath = context.init_result.base_path;
-                const targetPath = path.join(basePath, intent.target.path);
-
-                fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-
-                let existingContent = '';
-                try {
-                  existingContent = fs.readFileSync(targetPath, 'utf8');
-                } catch (e) {
-                  existingContent = `# Notes - ${intent.target.entity}\n\n`;
-                }
-
-                // Format note entry with timestamp
-                const timestamp = new Date().toISOString().split('T')[0];
-                const tags = intent.extracted.tags.length > 0
-                  ? `\nTags: #${intent.extracted.tags.join(' #')}`
-                  : '';
-                const noteEntry = `\n## ${timestamp} - ${intent.extracted.title}\n\n${intent.extracted.content}${tags}\n`;
-
-                const updatedContent = existingContent + noteEntry;
-                fs.writeFileSync(targetPath, updatedContent);
-
-                return {
-                  response: `Saved note to ${intent.target.entity}.`,
-                  action_taken: `Added note: "${intent.extracted.title}"`,
-                  files_modified: [intent.target.path]
-                };
-            output_variable: final_result
-
-        event:
-          # Calendar entry
-          - action: script.execute
-            inputs:
-              code: |
-                const fs = require('fs');
-                const path = require('path');
-
-                const intent = context.parsed_intent;
-                const basePath = context.init_result.base_path;
-                const calendarPath = path.join(basePath, 'Calendar/Future_Events.md');
-
-                fs.mkdirSync(path.dirname(calendarPath), { recursive: true });
-
-                let existingContent = '';
-                try {
-                  existingContent = fs.readFileSync(calendarPath, 'utf8');
-                } catch (e) {
-                  existingContent = '# Future Events\n\n';
-                }
-
-                const eventDate = intent.extracted.due_date || 'TBD';
-                const eventEntry = `- **${eventDate}**: ${intent.extracted.title}\n`;
-
-                const updatedContent = existingContent + eventEntry;
-                fs.writeFileSync(calendarPath, updatedContent);
-
-                return {
-                  response: `Added event to calendar: ${intent.extracted.title} on ${eventDate}.`,
-                  action_taken: `Added calendar event`,
-                  files_modified: ['Calendar/Future_Events.md']
-                };
-            output_variable: final_result
-
-        journal:
-          # Daily journal entry
-          - action: script.execute
-            inputs:
-              code: |
-                const fs = require('fs');
-                const path = require('path');
-
-                const intent = context.parsed_intent;
-                const basePath = context.init_result.base_path;
-
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const day = String(now.getDate()).padStart(2, '0');
-
-                const journalPath = path.join(
-                  basePath,
-                  `Journal/${year}/${month}/${day}.md`
-                );
-
-                fs.mkdirSync(path.dirname(journalPath), { recursive: true });
-
-                let existingContent = '';
-                try {
-                  existingContent = fs.readFileSync(journalPath, 'utf8');
-                } catch (e) {
-                  existingContent = `# Journal - ${year}-${month}-${day}\n\n`;
-                }
-
-                const time = now.toTimeString().split(' ')[0].slice(0, 5);
-                const entryContent = `\n## ${time}\n\n${intent.extracted.content}\n`;
-
-                const updatedContent = existingContent + entryContent;
-                fs.writeFileSync(journalPath, updatedContent);
-
-                return {
-                  response: `Journal entry saved.`,
-                  action_taken: `Added journal entry for ${year}-${month}-${day}`,
-                  files_modified: [`Journal/${year}/${month}/${day}.md`]
-                };
-            output_variable: final_result
-
-        reference:
-          # Static reference data (API keys, contacts, etc.)
-          - action: script.execute
-            inputs:
-              code: |
-                const fs = require('fs');
-                const path = require('path');
-
-                const intent = context.parsed_intent;
-                const basePath = context.init_result.base_path;
-                const targetPath = path.join(basePath, intent.target.path);
-
-                fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-
-                let existingContent = '';
-                try {
-                  existingContent = fs.readFileSync(targetPath, 'utf8');
-                } catch (e) {
-                  existingContent = `# Resources - ${intent.target.entity}\n\n`;
-                }
-
-                // Format reference entry
-                let refContent = `\n## ${intent.extracted.title}\n\n`;
-                if (intent.extracted.references) {
-                  for (const [key, value] of Object.entries(intent.extracted.references)) {
-                    refContent += `- **${key}**: \`${value}\`\n`;
-                  }
-                } else {
-                  refContent += `${intent.extracted.content}\n`;
-                }
-
-                const updatedContent = existingContent + refContent;
-                fs.writeFileSync(targetPath, updatedContent);
-
-                return {
-                  response: `Saved reference data to ${intent.target.entity}.`,
-                  action_taken: `Added reference: "${intent.extracted.title}"`,
-                  files_modified: [intent.target.path]
-                };
-            output_variable: final_result
-
-      default:
-        # Fallback for unknown intent types
-        - action: script.execute
-          inputs:
-            code: |
-              return {
-                response: "I'm not sure how to process that. Could you rephrase?",
-                action_taken: 'Unknown intent type',
-                files_modified: []
-              };
-          output_variable: final_result
-```
-
-## Step 7: Send Response to User
-
-Route the response back to the appropriate channel.
-
-```yaml
-- type: if
-  id: has_clarification
-  condition: '{{ clarification_response.needs_clarification }}'
+  condition: '{{ !result.done && intent.intent == "task" }}'
   then:
     - action: script.execute
       inputs:
         code: |
-          return context.clarification_response;
-      output_variable: output_result
-  else:
+          const fs = require('fs');
+          const path = require('path');
+          const basePath = context.init.base_path;
+          const intent = context.intent;
+
+          // Determine path
+          let filePath = intent.target.path;
+          if (!filePath) {
+            filePath = 'Personal/tasks.md';
+          }
+          const fullPath = path.join(basePath, filePath);
+          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+
+          // Read existing
+          let content = '';
+          try { content = fs.readFileSync(fullPath, 'utf8'); }
+          catch (e) { content = '# Tasks\n\n'; }
+
+          // Check duplicate
+          const title = intent.extracted.title || intent.extracted.content;
+          if (content.toLowerCase().includes(title.toLowerCase())) {
+            return {
+              response: `Task already exists: "${title}"`,
+              action: 'skipped',
+              files: [],
+              done: true
+            };
+          }
+
+          // Add task
+          const due = intent.extracted.due_date ? ` 📅 ${intent.extracted.due_date}` : '';
+          const tags = (intent.extracted.tags || []).map(t => `#${t}`).join(' ');
+          const entry = `- [ ] ${title}${due}${tags ? ' ' + tags : ''}\n`;
+
+          fs.writeFileSync(fullPath, content + entry);
+
+          return {
+            response: `Saved: "${title}"`,
+            action: 'saved',
+            files: [filePath],
+            done: true
+          };
+      output_variable: result
+```
+
+## Step 8: Handle Note
+
+```yaml
+- type: if
+  condition: '{{ !result.done && intent.intent == "note" }}'
+  then:
     - action: script.execute
       inputs:
         code: |
-          return context.final_result;
-      output_variable: output_result
+          const fs = require('fs');
+          const path = require('path');
+          const basePath = context.init.base_path;
+          const intent = context.intent;
+
+          let filePath = intent.target.path || 'Personal/notes.md';
+          const fullPath = path.join(basePath, filePath);
+          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+
+          let content = '';
+          try { content = fs.readFileSync(fullPath, 'utf8'); }
+          catch (e) { content = '# Notes\n\n'; }
+
+          const date = new Date().toISOString().split('T')[0];
+          const title = intent.extracted.title || 'Note';
+          const body = intent.extracted.content || context.inputs.message;
+          const entry = `\n## ${date} - ${title}\n\n${body}\n`;
+
+          fs.writeFileSync(fullPath, content + entry);
+
+          return {
+            response: `Saved note: "${title}"`,
+            action: 'saved',
+            files: [filePath],
+            done: true
+          };
+      output_variable: result
 ```
+
+## Step 9: Handle Event
+
+```yaml
+- type: if
+  condition: '{{ !result.done && intent.intent == "event" }}'
+  then:
+    - action: script.execute
+      inputs:
+        code: |
+          const fs = require('fs');
+          const path = require('path');
+          const basePath = context.init.base_path;
+          const intent = context.intent;
+
+          const filePath = 'Calendar/events.md';
+          const fullPath = path.join(basePath, filePath);
+          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+
+          let content = '';
+          try { content = fs.readFileSync(fullPath, 'utf8'); }
+          catch (e) { content = '# Events\n\n'; }
+
+          const date = intent.extracted.due_date || 'TBD';
+          const title = intent.extracted.title || intent.extracted.content;
+          const entry = `- **${date}**: ${title}\n`;
+
+          fs.writeFileSync(fullPath, content + entry);
+
+          return {
+            response: `Event added: "${title}" on ${date}`,
+            action: 'saved',
+            files: [filePath],
+            done: true
+          };
+      output_variable: result
+```
+
+## Step 10: Handle Journal
+
+```yaml
+- type: if
+  condition: '{{ !result.done && intent.intent == "journal" }}'
+  then:
+    - action: script.execute
+      inputs:
+        code: |
+          const fs = require('fs');
+          const path = require('path');
+          const basePath = context.init.base_path;
+          const intent = context.intent;
+
+          const now = new Date();
+          const y = now.getFullYear();
+          const m = String(now.getMonth() + 1).padStart(2, '0');
+          const d = String(now.getDate()).padStart(2, '0');
+          const time = now.toTimeString().slice(0, 5);
+
+          const filePath = `Journal/${y}-${m}-${d}.md`;
+          const fullPath = path.join(basePath, filePath);
+          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+
+          let content = '';
+          try { content = fs.readFileSync(fullPath, 'utf8'); }
+          catch (e) { content = `# Journal - ${y}-${m}-${d}\n\n`; }
+
+          const body = intent.extracted.content || context.inputs.message;
+          const entry = `\n## ${time}\n\n${body}\n`;
+
+          fs.writeFileSync(fullPath, content + entry);
+
+          return {
+            response: 'Journal entry saved.',
+            action: 'saved',
+            files: [filePath],
+            done: true
+          };
+      output_variable: result
+```
+
+## Step 11: Handle Reference
+
+```yaml
+- type: if
+  condition: '{{ !result.done && intent.intent == "reference" }}'
+  then:
+    - action: script.execute
+      inputs:
+        code: |
+          const fs = require('fs');
+          const path = require('path');
+          const basePath = context.init.base_path;
+          const intent = context.intent;
+
+          let filePath = intent.target.path || 'Personal/resources.md';
+          const fullPath = path.join(basePath, filePath);
+          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+
+          let content = '';
+          try { content = fs.readFileSync(fullPath, 'utf8'); }
+          catch (e) { content = '# Resources\n\n'; }
+
+          const title = intent.extracted.title || 'Reference';
+          const body = intent.extracted.content || context.inputs.message;
+          const entry = `\n## ${title}\n\n${body}\n`;
+
+          fs.writeFileSync(fullPath, content + entry);
+
+          return {
+            response: `Saved: "${title}"`,
+            action: 'saved',
+            files: [filePath],
+            done: true
+          };
+      output_variable: result
+```
+
+## Step 12: Fallback
+
+```yaml
+- type: if
+  condition: '{{ !result.done }}'
+  then:
+    - action: script.execute
+      inputs:
+        code: |
+          return {
+            response: "I'm not sure how to handle that. Try rephrasing?",
+            action: 'unknown',
+            files: [],
+            done: true
+          };
+      output_variable: result
+```
+
+## Step 13: Send Response
 
 ```yaml
 - type: switch
@@ -705,85 +603,81 @@ Route the response back to the appropriate channel.
       - action: slack.chat.postMessage
         inputs:
           channel: '{{ inputs.channel_id }}'
-          text: '{{ output_result.response }}'
-        output_variable: slack_reply
-
+          text: '{{ result.response }}'
     telegram:
       - action: telegram.sendMessage
         inputs:
           chat_id: '{{ inputs.channel_id }}'
-          text: '{{ output_result.response }}'
-        output_variable: telegram_reply
-
+          text: '{{ result.response }}'
   default:
-    # CLI output - just log
     - action: script.execute
       inputs:
         code: |
-          console.log('LifeOS Response:', context.output_result.response);
-          return { logged: true };
-      output_variable: cli_output
+          console.log(context.result.response);
+          return {};
 ```
 
-## Step 8: Set Workflow Outputs
+## Step 14: Set Outputs
 
 ```yaml
 action: script.execute
 inputs:
   code: |
-    const result = context.output_result;
+    const r = context.result;
     return {
-      response: result.response,
-      action_taken: result.action_taken,
-      files_modified: result.files_modified || []
+      response: r.response,
+      action: r.action,
+      files: r.files || []
     };
-output_variable: workflow_output
+output_variable: output
 ```
 
 ---
 
-## Architecture Notes
+## Usage
 
-### Module A: Unified Ingestion Layer
-- Accepts input from Slack, Telegram, or CLI via triggers
-- Normalizes all inputs to standard format: `{ message, source, channel_id }`
+```bash
+# Write a task
+./marktoflow run examples/lifeos/workflow.md \
+  --input message="Remind me to check the server logs tomorrow"
 
-### Module B: Context Router (The Librarian)
-- Scans directory tree to understand current life context
-- Uses AI to parse intent and route to appropriate location
-- Triggers clarification when confidence < 80%
+# Ask a question
+./marktoflow run examples/lifeos/workflow.md \
+  --input message="What is the API key for Apollo?"
 
-### Module C: Semantic Reconciler (The Editor)
-- Checks for duplicates before writing
-- Updates existing entries instead of creating duplicates
-- Maintains clean, organized files
+# Save a note
+./marktoflow run examples/lifeos/workflow.md \
+  --input message="The client prefers email over phone calls"
 
-### Module D: Retrieval Engine (The Memory)
-- Handles query intent type
-- Searches relevant files for information
-- Returns factual answers grounded in stored data
+# Add an event
+./marktoflow run examples/lifeos/workflow.md \
+  --input message="Meeting with John on Friday at 2pm"
 
-### Taxonomy (4-Level Hierarchy)
+# Journal entry
+./marktoflow run examples/lifeos/workflow.md \
+  --input message="I felt great today, finished the MVP"
+
+# Save reference data
+./marktoflow run examples/lifeos/workflow.md \
+  --input message="The API key for Apollo is 12345"
+```
+
+## Knowledge Base Structure
+
 ```
 LifeOS/
 ├── Work/
-│   ├── Projects/        # Active work projects
-│   ├── Areas/           # Ongoing responsibilities
-│   └── Archives/        # Completed/inactive
+│   ├── Projects/Apollo/
+│   │   ├── tasks.md
+│   │   ├── notes.md
+│   │   └── resources.md
+│   └── Areas/
 ├── Personal/
-│   ├── Projects/
-│   ├── Areas/
-│   └── Archives/
+│   ├── tasks.md
+│   ├── notes.md
+│   └── resources.md
 ├── Calendar/
-│   ├── Future_Events.md
-│   └── Recurring.md
+│   └── events.md
 └── Journal/
-    └── YYYY/MM/DD.md
+    └── 2024-01-15.md
 ```
-
-### Artifact Types
-- `tasks.md` - To-do items with checkboxes
-- `notes.md` - General notes and thoughts
-- `resources.md` - Static reference data
-- `investigation.md` - Deep dives and research
-- `meeting_logs.md` - Meeting notes and conversations

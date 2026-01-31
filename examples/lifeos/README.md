@@ -1,188 +1,157 @@
 # LifeOS: Autonomous Knowledge Engine
 
-A "headless" operating system for your life. It solves the fundamental friction of Knowledge Management: **Capturing is fast, but Organization is slow.**
+A "headless" operating system for your life. Talk to it naturally - it handles everything else.
 
-Most people let their notes become a digital junkyard because they don't have the energy to file things correctly. LifeOS removes this burden. The user simply "talks" to the system via their favorite chat app. An AI Agent—acting as a Librarian, Secretary, and Analyst—autonomously handles the rest.
+**The Problem:** Capturing is fast, but organization is slow. Most notes become a digital junkyard.
+
+**The Solution:** Just talk. LifeOS automatically routes, organizes, and retrieves your knowledge.
 
 ## Quick Start
 
 ```bash
-# Run the main workflow
+# Write a task
 ./marktoflow run examples/lifeos/workflow.md \
   --input message="Remind me to check the server logs tomorrow"
 
-# Query mode
-./marktoflow run examples/lifeos/retrieval.md \
-  --input query="What is the API key for Apollo?"
+# Ask a question
+./marktoflow run examples/lifeos/workflow.md \
+  --input message="What is the API key for Apollo?"
+
+# Save a note
+./marktoflow run examples/lifeos/workflow.md \
+  --input message="The client prefers email over phone calls"
 ```
 
-## Architecture
+## What It Does
 
-LifeOS consists of four AI modules working in a pipeline:
-
-### Module A: Unified Ingestion Layer (The Listener)
-- Accepts webhooks from Slack, Telegram, WhatsApp
-- Normalizes input to standard format: `{ message, source, channel_id }`
-- **Workflow:** `webhook-ingestion.md`
-
-### Module B: Context Router (The Librarian)
-- Parses intent: task, note, event, query, journal, reference
-- Routes to appropriate folder in the knowledge base
-- Triggers clarification when confidence < 80%
-- **Prompt:** `prompts/librarian.md`
-
-### Module C: Semantic Reconciler (The Editor)
-- Deduplicates before writing
-- Updates existing entries instead of creating duplicates
-- Implements "Read-Compare-Write" pattern
-- **Prompt:** `prompts/reconciler.md`
-
-### Module D: Retrieval Engine (The Memory)
-- Indexes content for Q&A
-- Searches relevant files for questions
-- Grounds answers in factual stored data
-- **Workflow:** `retrieval.md`
-- **Prompt:** `prompts/retrieval.md`
-
-## Directory Structure
+### Write Mode
+Send unstructured text → LifeOS structures and files it.
 
 ```
-lifeos/
-├── workflow.md              # Main orchestrator workflow
-├── webhook-ingestion.md     # Slack/Telegram webhook handler
-├── retrieval.md             # Q&A retrieval workflow
-├── README.md                # This file
-└── prompts/
-    ├── librarian.md         # Intent parsing prompt
-    ├── reconciler.md        # Deduplication prompt
-    └── retrieval.md         # Q&A prompt
-```
-
-## Knowledge Base Taxonomy
-
-LifeOS enforces a strict 4-level hierarchy:
-
-```
-LifeOS/
-├── Work/
-│   ├── Projects/           # Active work projects
-│   │   └── Apollo/
-│   │       ├── tasks.md
-│   │       ├── notes.md
-│   │       ├── resources.md
-│   │       ├── investigation.md
-│   │       └── meeting_logs.md
-│   ├── Areas/              # Ongoing responsibilities
-│   └── Archives/           # Completed/inactive
-├── Personal/
-│   ├── Projects/
-│   ├── Areas/
-│   └── Archives/
-├── Calendar/
-│   ├── Future_Events.md
-│   └── Recurring.md
-└── Journal/
-    └── YYYY/MM/DD.md
-```
-
-## User Experience Examples
-
-### Capture Flow (Write)
-```
-User: "Remind me to check the server logs for Project Apollo tomorrow.
-       Also, the client mentioned the API key is 12345."
+You: "Remind me to check the server logs for Project Apollo tomorrow.
+      Also, the client mentioned the API key is 12345."
 
 LifeOS:
-1. Parses intent → Task (check logs) + Reference (API key)
-2. Extracts time → "Tomorrow" → 2024-01-16
-3. Routes → Work/Projects/Apollo
-4. Files:
-   - Appends task to tasks.md with due date
-   - Appends API key to resources.md
+  1. Parses intent → Task (check logs) + Reference (API key)
+  2. Extracts time → "Tomorrow" → 2026-02-01
+  3. Routes → Work/Projects/Apollo
+  4. Files:
+     - Appends task to tasks.md with due date
+     - Appends API key to resources.md
 
-Response: "Saved to Project Apollo."
+Response: Saved to Project Apollo.
 ```
 
-### Clarification Flow (Safety Valve)
+### Read Mode
+Ask questions → LifeOS searches and answers.
+
 ```
-User: "Don't forget the deadline."
+You: "What is the API key for Apollo?"
 
-LifeOS: (Confidence Low)
-"Which deadline are you referring to? I see active deadlines for
-**Project Apollo** and **House Hunting**."
+LifeOS:
+  1. Searches knowledge base
+  2. Finds match in Work/Projects/Apollo/resources.md
 
-User: "Apollo."
+Response: The API key is 12345.
+```
+
+### Clarification Mode
+When uncertain, LifeOS asks instead of guessing.
+
+```
+You: "Don't forget the deadline."
+
+LifeOS: "Which deadline? I see active deadlines for
+        Project Apollo and House Hunting."
+
+You: "Apollo."
 
 LifeOS: "Got it. Updating Project Apollo."
 ```
 
-### Retrieval Flow (Read)
-```
-User: "What is the API key for Apollo?"
+## Supported Intents
 
-LifeOS: (Searches resources.md)
-Response: "The API key is 12345."
+| Intent | Triggers | Example |
+|--------|----------|---------|
+| **query** | what, when, where, who, how, why, ? | "What's the API key?" |
+| **task** | remind, todo, need to, should, must | "Remind me to call John" |
+| **note** | note that, remember, learned | "The client prefers email" |
+| **event** | meeting, appointment, on [date] | "Meeting Friday at 2pm" |
+| **journal** | I feel, today I, reflecting | "I felt great today" |
+| **reference** | API key, password, phone, address | "The API key is 12345" |
+
+## Knowledge Base Structure
+
 ```
+LifeOS/
+├── Work/
+│   ├── Projects/
+│   │   └── Apollo/
+│   │       ├── tasks.md      # To-dos with checkboxes
+│   │       ├── notes.md      # General notes
+│   │       └── resources.md  # API keys, contacts, etc.
+│   ├── Areas/                # Ongoing responsibilities
+│   └── Archives/             # Completed projects
+├── Personal/
+│   ├── tasks.md
+│   ├── notes.md
+│   └── resources.md
+├── Calendar/
+│   └── events.md             # Upcoming events
+└── Journal/
+    └── 2026-01-31.md         # Daily entries
+```
+
+## Architecture
+
+Four AI modules working in a pipeline:
+
+1. **Ingestion** - Normalizes input from CLI, Slack, or Telegram
+2. **Router** - Parses intent, determines target location
+3. **Reconciler** - Checks for duplicates, updates existing entries
+4. **Retrieval** - Searches and answers questions
 
 ## Setup
 
 ### Environment Variables
 
 ```bash
-# AI Agent (required)
+# Required for AI
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Slack integration (optional)
+# Optional: Slack integration
 SLACK_BOT_TOKEN=xoxb-...
 
-# Telegram integration (optional)
+# Optional: Telegram integration
 TELEGRAM_BOT_TOKEN=123456:ABC...
-
-# Knowledge base location
-LIFEOS_KNOWLEDGE_BASE=./LifeOS
 ```
 
-### Slack Setup
+### Custom Knowledge Base Location
 
-1. Create a Slack App at https://api.slack.com/apps
-2. Enable Event Subscriptions
-3. Set Request URL: `https://your-server.com/lifeos/slack`
-4. Subscribe to events:
-   - `message.im` (Direct messages)
-   - `app_mention` (Mentions in channels)
-5. Install app to workspace
+```bash
+./marktoflow run examples/lifeos/workflow.md \
+  --input message="Your message" \
+  --input knowledge_base="/path/to/your/lifeos"
+```
 
-### Telegram Setup
+## Files
 
-1. Create bot via @BotFather
-2. Get token
-3. Set webhook:
-   ```
-   https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://your-server.com/lifeos/telegram
-   ```
+```
+examples/lifeos/
+├── workflow.md           # Main unified workflow
+├── README.md             # This file
+└── prompts/
+    ├── librarian.md      # Intent parsing guidance
+    ├── reconciler.md     # Deduplication logic
+    └── retrieval.md      # Q&A guidance
+```
 
-## Comparison to Market Tools
+## Comparison to Alternatives
 
-| Feature | LifeOS | Obsidian + Plugins | Mem.ai / Fabric |
-| :--- | :--- | :--- | :--- |
-| **Data Ownership** | 100% Local Files | 100% Local Files | Proprietary Cloud |
-| **Auto-Filing** | ✅ Smart Agent | ❌ Manual / Rigid Rules | ✅ AI Tagging |
-| **Deduplication** | ✅ Smart Rewriting | ❌ Appends Only | ❌ Unclear |
-| **Clarification** | ✅ Asks Questions | ❌ Silent | ❌ Silent |
-
-## Technical Stack
-
-- **Core:** marktoflow v2.0
-- **AI:** Claude Sonnet/Haiku
-- **Database:** Local Markdown files (Obsidian-compatible)
-- **Messaging:** Slack, Telegram webhooks
-- **Storage:** File system
-
-## Future Enhancements
-
-- Vector embeddings for semantic search (ChromaDB)
-- Voice transcription input
-- WhatsApp integration
-- Daily/weekly summary generation
-- Automatic tag suggestions
-- Cross-reference linking
+| Feature | LifeOS | Obsidian + Plugins | Mem.ai |
+|---------|--------|-------------------|--------|
+| Data Ownership | 100% Local | 100% Local | Cloud |
+| Auto-Filing | AI Agent | Manual/Rules | AI Tagging |
+| Deduplication | Smart | Appends Only | Unclear |
+| Clarification | Asks Questions | Silent | Silent |
+| Q&A | Built-in RAG | Plugin Required | Built-in |
